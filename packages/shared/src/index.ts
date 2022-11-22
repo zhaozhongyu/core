@@ -143,6 +143,7 @@ export const invokeArrayFns = (fns: Function[], arg?: any) => {
   }
 }
 
+/** 定义一个key值 */
 export const def = (obj: object, key: string | symbol, value: any) => {
   Object.defineProperty(obj, key, {
     configurable: true,
@@ -150,6 +151,7 @@ export const def = (obj: object, key: string | symbol, value: any) => {
     value
   })
 }
+
 
 export const toNumber = (val: any): any => {
   const n = parseFloat(val)

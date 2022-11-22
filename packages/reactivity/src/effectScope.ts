@@ -3,6 +3,7 @@ import { warn } from './warning'
 
 let activeEffectScope: EffectScope | undefined
 
+/** 创建一个 effect 作用域，可以捕获其中所创建的响应式副作用 (即计算属性和侦听器)，这样捕获到的副作用可以一起处理(一起关闭)。 */
 export class EffectScope {
   /**
    * @internal
@@ -21,9 +22,10 @@ export class EffectScope {
    * only assigned by undetached scope
    * @internal
    */
-  parent: EffectScope | undefined
+  parent: EffectScope | undefined // 父节点
   /**
    * record undetached scopes
+   * 记录子scope
    * @internal
    */
   scopes: EffectScope[] | undefined
@@ -44,6 +46,7 @@ export class EffectScope {
     }
   }
 
+  // 执行effectScope
   run<T>(fn: () => T): T | undefined {
     if (this.active) {
       const currentEffectScope = activeEffectScope
@@ -103,10 +106,12 @@ export class EffectScope {
   }
 }
 
+
 export function effectScope(detached?: boolean) {
   return new EffectScope(detached)
 }
 
+/** 记录effectScope */
 export function recordEffectScope(
   effect: ReactiveEffect,
   scope: EffectScope | undefined = activeEffectScope
@@ -116,10 +121,12 @@ export function recordEffectScope(
   }
 }
 
+// 获取当前激活的scope
 export function getCurrentScope() {
   return activeEffectScope
 }
 
+// 添加scope清空时函数.
 export function onScopeDispose(fn: () => void) {
   if (activeEffectScope) {
     activeEffectScope.cleanups.push(fn)

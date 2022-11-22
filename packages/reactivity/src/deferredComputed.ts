@@ -8,6 +8,7 @@ const tick = /*#__PURE__*/ Promise.resolve()
 const queue: any[] = []
 let queued = false
 
+// 加入微任务队列延后计算
 const scheduler = (fn: any) => {
   queue.push(fn)
   if (!queued) {
@@ -16,6 +17,7 @@ const scheduler = (fn: any) => {
   }
 }
 
+// 立刻进行计算
 const flush = () => {
   for (let i = 0; i < queue.length; i++) {
     queue[i]()
@@ -24,6 +26,7 @@ const flush = () => {
   queued = false
 }
 
+// 延后计算的ref实现, 没有直接在框架中使用.
 class DeferredComputedRefImpl<T> {
   public dep?: Dep = undefined
 

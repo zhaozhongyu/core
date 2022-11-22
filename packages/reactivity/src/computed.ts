@@ -23,6 +23,7 @@ export interface WritableComputedOptions<T> {
   set: ComputedSetter<T>
 }
 
+/** computed的实现类 */
 export class ComputedRefImpl<T> {
   public dep?: Dep = undefined
 
@@ -43,6 +44,7 @@ export class ComputedRefImpl<T> {
   ) {
     this.effect = new ReactiveEffect(getter, () => {
       if (!this._dirty) {
+        // 触发依赖更新时, 也就是执行triggerEffect时, 会先执行当前函数scheduler, 先将dirty设置为true, 并尝试去触发依赖当前computed的函数, 如别的watch等
         this._dirty = true
         triggerRefValue(this)
       }
@@ -52,10 +54,13 @@ export class ComputedRefImpl<T> {
     this[ReactiveFlags.IS_READONLY] = isReadonly
   }
 
+  // 执行triggerEffect后, 会先将dirty置为true, 然后尝试触发依赖, 此时依赖的函数重新获取当前computed函数值时, 执行对应的getter函数, 此时会触发依赖收集
   get value() {
     // the computed ref may get wrapped by other proxies e.g. readonly() #3376
     const self = toRaw(this)
+    // 获取value值时收集依赖
     trackRefValue(self)
+    // 如果是_dirty为true, 则此时重新计算
     if (self._dirty || !self._cacheable) {
       self._dirty = false
       self._value = self.effect.run()!
@@ -76,6 +81,7 @@ export function computed<T>(
   options: WritableComputedOptions<T>,
   debugOptions?: DebuggerOptions
 ): WritableComputedRef<T>
+/** computed函数入口 */
 export function computed<T>(
   getterOrOptions: ComputedGetter<T> | WritableComputedOptions<T>,
   debugOptions?: DebuggerOptions,
@@ -84,6 +90,7 @@ export function computed<T>(
   let getter: ComputedGetter<T>
   let setter: ComputedSetter<T>
 
+  // 处理getter和setter的指向
   const onlyGetter = isFunction(getterOrOptions)
   if (onlyGetter) {
     getter = getterOrOptions

@@ -40,6 +40,7 @@ const enum TargetType {
   COLLECTION = 2
 }
 
+/** 返回不同的target类型 */
 function targetTypeMap(rawType: string) {
   switch (rawType) {
     case 'Object':
@@ -55,6 +56,7 @@ function targetTypeMap(rawType: string) {
   }
 }
 
+/** 获取target类型 */
 function getTargetType(value: Target) {
   return value[ReactiveFlags.SKIP] || !Object.isExtensible(value)
     ? TargetType.INVALID
@@ -87,6 +89,7 @@ export type UnwrapNestedRefs<T> = T extends Ref ? T : UnwrapRefSimple<T>
  * ```
  */
 export function reactive<T extends object>(target: T): UnwrapNestedRefs<T>
+/** 转换为reactive对象 */
 export function reactive(target: object) {
   // if trying to observe a readonly proxy, return the readonly version.
   if (isReadonly(target)) {
@@ -109,6 +112,7 @@ export type ShallowReactive<T> = T & { [ShallowReactiveMarker]?: true }
  * Return a shallowly-reactive copy of the original object, where only the root
  * level properties are reactive. It also does not auto-unwrap refs (even at the
  * root level).
+ * 浅响应
  */
 export function shallowReactive<T extends object>(
   target: T
@@ -178,6 +182,7 @@ export function shallowReadonly<T extends object>(target: T): Readonly<T> {
   )
 }
 
+/** 创建响应式对象, 转换为proxy包装的对象使用 */
 function createReactiveObject(
   target: Target,
   isReadonly: boolean,
@@ -217,6 +222,7 @@ function createReactiveObject(
   return proxy
 }
 
+/** 判断是否reactive */
 export function isReactive(value: unknown): boolean {
   if (isReadonly(value)) {
     return isReactive((value as Target)[ReactiveFlags.RAW])
@@ -224,23 +230,28 @@ export function isReactive(value: unknown): boolean {
   return !!(value && (value as Target)[ReactiveFlags.IS_REACTIVE])
 }
 
+/** 判断是否只读 */
 export function isReadonly(value: unknown): boolean {
   return !!(value && (value as Target)[ReactiveFlags.IS_READONLY])
 }
 
+/** 判断是否shadow */
 export function isShallow(value: unknown): boolean {
   return !!(value && (value as Target)[ReactiveFlags.IS_SHALLOW])
 }
 
+/** @description 判断是否proxy */
 export function isProxy(value: unknown): boolean {
   return isReactive(value) || isReadonly(value)
 }
 
+/** @description 获取原始值 */
 export function toRaw<T>(observed: T): T {
   const raw = observed && (observed as Target)[ReactiveFlags.RAW]
   return raw ? toRaw(raw) : observed
 }
 
+/** 标记当前对象为raw */
 export function markRaw<T extends object>(
   value: T
 ): T & { [RawSymbol]?: true } {
@@ -248,8 +259,10 @@ export function markRaw<T extends object>(
   return value
 }
 
+/** @description 转换为reactive对象 */
 export const toReactive = <T extends unknown>(value: T): T =>
   isObject(value) ? reactive(value) : value
 
+/** @description 转换为readonly对象 */
 export const toReadonly = <T extends unknown>(value: T): T =>
   isObject(value) ? readonly(value as Record<any, any>) : value

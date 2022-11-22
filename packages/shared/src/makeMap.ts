@@ -4,6 +4,7 @@
  * IMPORTANT: all calls of this function must be prefixed with
  * \/\*#\_\_PURE\_\_\*\/
  * So that rollup can tree-shake them if necessary.
+ * 返回的方法可以判断一个key是否在map中
  */
 export function makeMap(
   str: string,

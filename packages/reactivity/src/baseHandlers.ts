@@ -32,6 +32,7 @@ import {
 import { isRef } from './ref'
 import { warn } from './warning'
 
+/** 是否不可触发回调的key */
 const isNonTrackableKeys = /*#__PURE__*/ makeMap(`__proto__,__v_isRef,__isVue`)
 
 const builtInSymbols = new Set(
@@ -85,8 +86,10 @@ function createArrayInstrumentations() {
   return instrumentations
 }
 
+/** 创建getter函数,  */
 function createGetter(isReadonly = false, shallow = false) {
   return function get(target: Target, key: string | symbol, receiver: object) {
+    // 获取flag值函数
     if (key === ReactiveFlags.IS_REACTIVE) {
       return !isReadonly
     } else if (key === ReactiveFlags.IS_READONLY) {
@@ -110,6 +113,7 @@ function createGetter(isReadonly = false, shallow = false) {
 
     const targetIsArray = isArray(target)
 
+    // 获取array的原有属性, indexOf, includes等
     if (!isReadonly && targetIsArray && hasOwn(arrayInstrumentations, key)) {
       return Reflect.get(arrayInstrumentations, key, receiver)
     }
@@ -120,19 +124,23 @@ function createGetter(isReadonly = false, shallow = false) {
       return res
     }
 
+    // 如果不是只读, 此时触发收集
     if (!isReadonly) {
       track(target, TrackOpTypes.GET, key)
     }
 
+    // 浅层直接返回
     if (shallow) {
       return res
     }
 
+    // 非浅层, 自动解包ref, 这里不需要再转一次reactive是因为如果value是object的情况下, 默认会转成reactive
     if (isRef(res)) {
       // ref unwrapping - skip unwrap for Array + integer key.
       return targetIsArray && isIntegerKey(key) ? res : res.value
     }
 
+    // 如果不是readonly, 则此时用reactive包装.
     if (isObject(res)) {
       // Convert returned value into a proxy as well. we do the isObject check
       // here to avoid invalid value warning. Also need to lazy access readonly
@@ -147,6 +155,7 @@ function createGetter(isReadonly = false, shallow = false) {
 const set = /*#__PURE__*/ createSetter()
 const shallowSet = /*#__PURE__*/ createSetter(true)
 
+/** 创建setter函数 */
 function createSetter(shallow = false) {
   return function set(
     target: object,
@@ -164,6 +173,7 @@ function createSetter(shallow = false) {
         value = toRaw(value)
       }
       if (!isArray(target) && isRef(oldValue) && !isRef(value)) {
+        // 如果oldValue是ref, 不在此处触发回调.
         oldValue.value = value
         return true
       }
@@ -178,6 +188,7 @@ function createSetter(shallow = false) {
     const result = Reflect.set(target, key, value, receiver)
     // don't trigger if target is something up in the prototype chain of original
     if (target === toRaw(receiver)) {
+      // 触发回调
       if (!hadKey) {
         trigger(target, TriggerOpTypes.ADD, key, value)
       } else if (hasChanged(value, oldValue)) {
@@ -188,6 +199,7 @@ function createSetter(shallow = false) {
   }
 }
 
+/** 拦截删除操作, 触发watch */
 function deleteProperty(target: object, key: string | symbol): boolean {
   const hadKey = hasOwn(target, key)
   const oldValue = (target as any)[key]
@@ -198,6 +210,7 @@ function deleteProperty(target: object, key: string | symbol): boolean {
   return result
 }
 
+/** 拦截has操作, 触发依赖收集 */
 function has(target: object, key: string | symbol): boolean {
   const result = Reflect.has(target, key)
   if (!isSymbol(key) || !builtInSymbols.has(key)) {

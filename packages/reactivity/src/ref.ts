@@ -20,7 +20,9 @@ import { createDep, Dep } from './dep'
 
 declare const RefSymbol: unique symbol
 export declare const RawSymbol: unique symbol
-
+// 当使用ref的时候, 一般是用于创建普通数据类型的响应式. 
+// 如果将一个对象赋值给 ref，那么这个对象将通过 reactive() 转为具有深层次响应式的对象。这也意味着如果对象中包含了嵌套的 ref，它们将被深层地解包。
+/** 定义ref的数据类型, 存在value值 */
 export interface Ref<T = any> {
   value: T
   /**
@@ -36,6 +38,7 @@ type RefBase<T> = {
   value: T
 }
 
+/** 收集ref依赖 */
 export function trackRefValue(ref: RefBase<any>) {
   if (shouldTrack && activeEffect) {
     ref = toRaw(ref)
@@ -51,6 +54,7 @@ export function trackRefValue(ref: RefBase<any>) {
   }
 }
 
+/** 触发ref回调计算 */
 export function triggerRefValue(ref: RefBase<any>, newVal?: any) {
   ref = toRaw(ref)
   if (ref.dep) {
@@ -68,6 +72,7 @@ export function triggerRefValue(ref: RefBase<any>, newVal?: any) {
 }
 
 export function isRef<T>(r: Ref<T> | unknown): r is Ref<T>
+/** 判断是否ref类型 */
 export function isRef(r: any): r is Ref {
   return !!(r && r.__v_isRef === true)
 }
@@ -77,6 +82,7 @@ export function ref<T extends object>(
 ): [T] extends [Ref] ? T : Ref<UnwrapRef<T>>
 export function ref<T>(value: T): Ref<UnwrapRef<T>>
 export function ref<T = any>(): Ref<T | undefined>
+/** 转换为ref */
 export function ref(value?: unknown) {
   return createRef(value, false)
 }
@@ -94,6 +100,7 @@ export function shallowRef(value?: unknown) {
   return createRef(value, true)
 }
 
+/** 创建响应式ref */
 function createRef(rawValue: unknown, shallow: boolean) {
   if (isRef(rawValue)) {
     return rawValue
@@ -101,6 +108,7 @@ function createRef(rawValue: unknown, shallow: boolean) {
   return new RefImpl(rawValue, shallow)
 }
 
+/** ref实现 */
 class RefImpl<T> {
   private _value: T
   private _rawValue: T
@@ -130,10 +138,12 @@ class RefImpl<T> {
   }
 }
 
+/** 触发ref回调计算 */
 export function triggerRef(ref: Ref) {
   triggerRefValue(ref, __DEV__ ? ref.value : void 0)
 }
 
+/** 去掉ref包裹 */
 export function unref<T>(ref: T | Ref<T>): T {
   return isRef(ref) ? (ref.value as any) : ref
 }
@@ -151,6 +161,7 @@ const shallowUnwrapHandlers: ProxyHandler<any> = {
   }
 }
 
+/**  */
 export function proxyRefs<T extends object>(
   objectWithRefs: T
 ): ShallowUnwrapRef<T> {
@@ -193,6 +204,7 @@ class CustomRefImpl<T> {
   }
 }
 
+/** 创建一个自定义的 ref，显式声明对其依赖追踪和更新触发的控制方式。 */
 export function customRef<T>(factory: CustomRefFactory<T>): Ref<T> {
   return new CustomRefImpl(factory) as any
 }
@@ -200,6 +212,8 @@ export function customRef<T>(factory: CustomRefFactory<T>): Ref<T> {
 export type ToRefs<T = any> = {
   [K in keyof T]: ToRef<T[K]>
 }
+
+/** 批量转换为ref, 将一个响应式对象转换为一个普通对象，这个普通对象的每个属性都是指向源对象相应属性的 ref。每个单独的 ref 都是使用 toRef() 创建的。 */
 export function toRefs<T extends object>(object: T): ToRefs<T> {
   if (__DEV__ && !isProxy(object)) {
     console.warn(`toRefs() expects a reactive object but received a plain one.`)
@@ -211,6 +225,7 @@ export function toRefs<T extends object>(object: T): ToRefs<T> {
   return ret
 }
 
+/** 对象的实现 */
 class ObjectRefImpl<T extends object, K extends keyof T> {
   public readonly __v_isRef = true
 
@@ -243,6 +258,7 @@ export function toRef<T extends object, K extends keyof T>(
   defaultValue: T[K]
 ): ToRef<Exclude<T[K], undefined>>
 
+/** 转换为ref, 基于响应式对象上的一个属性，创建一个对应的 ref。这样创建的 ref 与其源属性保持同步：改变源属性的值将更新 ref 的值，反之亦然。 */
 export function toRef<T extends object, K extends keyof T>(
   object: T,
   key: K,

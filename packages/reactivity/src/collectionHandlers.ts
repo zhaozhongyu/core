@@ -27,6 +27,7 @@ function get(
   const rawTarget = toRaw(target)
   const rawKey = toRaw(key)
   if (!isReadonly) {
+    // 非只读时触发收集
     if (key !== rawKey) {
       track(rawTarget, TrackOpTypes.GET, key)
     }
@@ -34,6 +35,7 @@ function get(
   }
   const { has } = getProto(rawTarget)
   const wrap = isShallow ? toShallow : isReadonly ? toReadonly : toReactive
+  // 获取并包装结果为响应式
   if (has.call(rawTarget, key)) {
     return wrap(target.get(key))
   } else if (has.call(rawTarget, rawKey)) {
@@ -44,6 +46,7 @@ function get(
     target.get(key)
   }
 }
+
 
 function has(this: CollectionTypes, key: unknown, isReadonly = false): boolean {
   const target = (this as any)[ReactiveFlags.RAW]
@@ -60,12 +63,14 @@ function has(this: CollectionTypes, key: unknown, isReadonly = false): boolean {
     : target.has(key) || target.has(rawKey)
 }
 
+// 获取map或者set的size
 function size(target: IterableCollections, isReadonly = false) {
   target = (target as any)[ReactiveFlags.RAW]
   !isReadonly && track(toRaw(target), TrackOpTypes.ITERATE, ITERATE_KEY)
   return Reflect.get(target, 'size', target)
 }
 
+// set类型触发添加, 依赖回调
 function add(this: SetTypes, value: unknown) {
   value = toRaw(value)
   const target = toRaw(this)
@@ -78,6 +83,7 @@ function add(this: SetTypes, value: unknown) {
   return this
 }
 
+// map类型触发set, 并且在新值不一致或者不存在时触发回调
 function set(this: MapTypes, key: unknown, value: unknown) {
   value = toRaw(value)
   const target = toRaw(this)
@@ -101,6 +107,7 @@ function set(this: MapTypes, key: unknown, value: unknown) {
   return this
 }
 
+// map或者set类型触发删除
 function deleteEntry(this: CollectionTypes, key: unknown) {
   const target = toRaw(this)
   const { has, get } = getProto(target)
@@ -121,6 +128,7 @@ function deleteEntry(this: CollectionTypes, key: unknown) {
   return result
 }
 
+// map或者set触发清除
 function clear(this: IterableCollections) {
   const target = toRaw(this)
   const hadItems = target.size !== 0
@@ -137,6 +145,7 @@ function clear(this: IterableCollections) {
   return result
 }
 
+// 对map和set创建遍历函数. 并且支持触发回调
 function createForEach(isReadonly: boolean, isShallow: boolean) {
   return function forEach(
     this: IterableCollections,
@@ -170,6 +179,7 @@ interface IterationResult {
   done: boolean
 }
 
+/// 创建迭代器
 function createIterableMethod(
   method: string | symbol,
   isReadonly: boolean,
@@ -214,6 +224,7 @@ function createIterableMethod(
   }
 }
 
+// 创建只读方法, 在readonly时劫持delete方法
 function createReadonlyMethod(type: TriggerOpTypes): Function {
   return function (this: CollectionTypes, ...args: unknown[]) {
     if (__DEV__) {
@@ -226,6 +237,7 @@ function createReadonlyMethod(type: TriggerOpTypes): Function {
     return type === TriggerOpTypes.DELETE ? false : this
   }
 }
+
 
 function createInstrumentations() {
   const mutableInstrumentations: Record<string, Function> = {
@@ -331,6 +343,7 @@ const [
   shallowReadonlyInstrumentations
 ] = /* #__PURE__*/ createInstrumentations()
 
+// 创建方法的读取函数, 比如上面定义的forEach
 function createInstrumentationGetter(isReadonly: boolean, shallow: boolean) {
   const instrumentations = shallow
     ? isReadonly
@@ -363,14 +376,17 @@ function createInstrumentationGetter(isReadonly: boolean, shallow: boolean) {
   }
 }
 
+// 可变类型函数
 export const mutableCollectionHandlers: ProxyHandler<CollectionTypes> = {
   get: /*#__PURE__*/ createInstrumentationGetter(false, false)
 }
 
+// 浅响应类型函数
 export const shallowCollectionHandlers: ProxyHandler<CollectionTypes> = {
   get: /*#__PURE__*/ createInstrumentationGetter(false, true)
 }
 
+// 只读类型函数
 export const readonlyCollectionHandlers: ProxyHandler<CollectionTypes> = {
   get: /*#__PURE__*/ createInstrumentationGetter(true, false)
 }

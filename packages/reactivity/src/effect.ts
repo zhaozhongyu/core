@@ -19,8 +19,10 @@ type KeyToDepMap = Map<any, Dep>
 const targetMap = new WeakMap<any, KeyToDepMap>()
 
 // The number of effects currently being tracked recursively.
+// 当前的依赖收集层级
 let effectTrackDepth = 0
 
+// 依赖收集层级操作数, 用于位运算
 export let trackOpBit = 1
 
 /**
@@ -50,6 +52,7 @@ export let activeEffect: ReactiveEffect | undefined
 export const ITERATE_KEY = Symbol(__DEV__ ? 'iterate' : '')
 export const MAP_KEY_ITERATE_KEY = Symbol(__DEV__ ? 'Map key iterate' : '')
 
+// 依赖收集中的依赖实现函数.
 export class ReactiveEffect<T = any> {
   active = true
   deps: Dep[] = []
@@ -77,18 +80,21 @@ export class ReactiveEffect<T = any> {
 
   constructor(
     public fn: () => T,
-    public scheduler: EffectScheduler | null = null,
+    public scheduler: EffectScheduler | null = null, // 通常是异步执行函数.
     scope?: EffectScope
   ) {
     recordEffectScope(this, scope)
   }
 
+  // 执行effect
   run() {
     if (!this.active) {
+      // 如果已经触发了stop, 则立刻执行, 不触发依赖收集, 用于在先触发了stop后异步触发run的情况
       return this.fn()
     }
     let parent: ReactiveEffect | undefined = activeEffect
     let lastShouldTrack = shouldTrack
+    // 获取当前
     while (parent) {
       if (parent === this) {
         return
@@ -96,35 +102,42 @@ export class ReactiveEffect<T = any> {
       parent = parent.parent
     }
     try {
+      // 临时记录activeEffect
       this.parent = activeEffect
       activeEffect = this
       shouldTrack = true
 
+      // 递归track的层级
       trackOpBit = 1 << ++effectTrackDepth
 
       if (effectTrackDepth <= maxMarkerBits) {
         initDepMarkers(this)
       } else {
+        // 层级过多时先清除再收集依赖的方式进行处理.
         cleanupEffect(this)
       }
       return this.fn()
     } finally {
       if (effectTrackDepth <= maxMarkerBits) {
+        // 如果使用init的方式进行收集, 此时需要去掉旧的收集内容.
         finalizeDepMarkers(this)
       }
 
       trackOpBit = 1 << --effectTrackDepth
 
+      // 恢复activeEffect
       activeEffect = this.parent
       shouldTrack = lastShouldTrack
       this.parent = undefined
 
+      // 如果设置了延后清除, 则再执行一次清除.
       if (this.deferStop) {
         this.stop()
       }
     }
   }
 
+  // 停止时如果正在运行, 则延后清除.
   stop() {
     // stopped while running itself - defer the cleanup
     if (activeEffect === this) {
@@ -139,6 +152,7 @@ export class ReactiveEffect<T = any> {
   }
 }
 
+// 删除 effect列表
 function cleanupEffect(effect: ReactiveEffect) {
   const { deps } = effect
   if (deps.length) {
@@ -195,21 +209,25 @@ export function stop(runner: ReactiveEffectRunner) {
 export let shouldTrack = true
 const trackStack: boolean[] = []
 
+/** 暂停依赖收集 */
 export function pauseTracking() {
   trackStack.push(shouldTrack)
   shouldTrack = false
 }
 
+/** 开始依赖收集 */
 export function enableTracking() {
   trackStack.push(shouldTrack)
   shouldTrack = true
 }
 
+/** 重置依赖收集 */
 export function resetTracking() {
   const last = trackStack.pop()
   shouldTrack = last === undefined ? true : last
 }
 
+/** 收集依赖, 先预处理依赖map后, 添加到依赖队列 */
 export function track(target: object, type: TrackOpTypes, key: unknown) {
   if (shouldTrack && activeEffect) {
     let depsMap = targetMap.get(target)
@@ -229,6 +247,7 @@ export function track(target: object, type: TrackOpTypes, key: unknown) {
   }
 }
 
+/** 收集依赖, 添加到依赖队列中, activeEffect表示正在执行的副作用函数 */
 export function trackEffects(
   dep: Dep,
   debuggerEventExtraInfo?: DebuggerEventExtraInfo
@@ -256,6 +275,7 @@ export function trackEffects(
   }
 }
 
+/** 触发回调 */
 export function trigger(
   target: object,
   type: TriggerOpTypes,
@@ -344,6 +364,7 @@ export function trigger(
   }
 }
 
+/** 触发回调计算, 先计算computed属性, 再计算别的属性 */
 export function triggerEffects(
   dep: Dep | ReactiveEffect[],
   debuggerEventExtraInfo?: DebuggerEventExtraInfo
@@ -351,7 +372,7 @@ export function triggerEffects(
   // spread into array for stabilization
   const effects = isArray(dep) ? dep : [...dep]
   for (const effect of effects) {
-    if (effect.computed) {
+    if (effect.computed) { // computed里面会定义
       triggerEffect(effect, debuggerEventExtraInfo)
     }
   }
@@ -362,6 +383,7 @@ export function triggerEffects(
   }
 }
 
+/** 触发单个回调计算 */
 function triggerEffect(
   effect: ReactiveEffect,
   debuggerEventExtraInfo?: DebuggerEventExtraInfo
@@ -371,7 +393,7 @@ function triggerEffect(
       effect.onTrigger(extend({ effect }, debuggerEventExtraInfo))
     }
     if (effect.scheduler) {
-      effect.scheduler()
+      effect.scheduler() // 在computed里面会使用
     } else {
       effect.run()
     }
